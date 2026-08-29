@@ -6,30 +6,31 @@
 #   3) 软件自愈兜底: 失联>25s 自动 modprobe 重绑(实测最可靠路径)
 # 日志: ~/.local/state/bt-watch.log ; 病因/死锁原理: ~/bh-workspace/docs/sliver-bt-stability/
 set -u
-DEVICE_GREP="${BT_WATCH_DEVICES:-X87|MCHOSE}"   # 设备名片段, 可改
+KB_GREP="${BT_WATCH_KB:-X87}"            # 触发自愈的判据设备(键盘; 鼠标在线不掩护它)
+LOG_GREP="${BT_WATCH_DEVICES:-X87|MCHOSE}"   # 打点/让路检测范围
 LOG="$HOME/.local/state/bt-watch.log"
 mkdir -p "$(dirname "$LOG")"
 log(){ echo "[$(date '+%F %T')] $*" >> "$LOG"; }
-log "bt-watch v4 启动(手动兼容+副作用声明) (pid $$)"
+log "bt-watch v4.1 启动(键盘单独判据+手动兼容+副作用声明) (pid $$)"
 
 state=up; down_since=0; notified=0; manual_until=0
 sco_last=0; dead_last=0
 while true; do
-    if bluetoothctl devices Connected 2>/dev/null | grep -qE "$DEVICE_GREP"; then cur=1; else cur=0; fi
+    if bluetoothctl devices Connected 2>/dev/null | grep -qE "$KB_GREP"; then cur=1; else cur=0; fi
 
     if [ "$cur" = 0 ] && [ "$state" = up ]; then
         state=down; down_since=$SECONDS; notified=0
-        log "键鼠断开; 内核现场:"
+        log "键盘断开($KB_GREP 离线); 内核现场:"
         journalctl -k --since '-25s' --no-pager 2>/dev/null | grep -i 'hci0' | tail -4 | sed 's/^/    /' >> "$LOG"
     elif [ "$cur" = 1 ] && [ "$state" = down ]; then
-        state=up; log "键鼠恢复(离线 $((SECONDS - down_since))s)"
+        state=up; log "键盘恢复(离线 $((SECONDS - down_since))s)"
     fi
 
     if [ "$state" = down ] && [ "$notified" = 0 ] && [ $((SECONDS - down_since)) -ge 25 ]; then
         notified=1
         # --- 手动恢复兼容: 未配对的新条目 = 用户在配对模式手动恢复, 自愈让路3分钟 ---
         unpaired=""
-        for a in $(bluetoothctl devices 2>/dev/null | grep -iE "$DEVICE_GREP" | awk '{print $2}'); do
+        for a in $(bluetoothctl devices 2>/dev/null | grep -iE "$LOG_GREP" | awk '{print $2}'); do
             bluetoothctl info "$a" 2>/dev/null | grep -q 'Paired: yes' || unpaired="$unpaired $a"
         done
         if [ -n "$unpaired" ]; then
