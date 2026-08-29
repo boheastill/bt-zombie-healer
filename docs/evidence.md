@@ -61,6 +61,17 @@ $ sudo modprobe -r btusb btmtk && sudo modprobe btusb
 
 `systemctl restart bluetooth` alone was **not** reliable; driver rebind is. (Same reset recommended by the Framework knowledge base for MT79xx.)
 
+## 4.5 The smoking gun: live connection dropped by the host mid-use
+
+During active typing (not idle, no 0x13 involved), the kernel logged:
+
+```
+kernel: Bluetooth: hci0: ACL packet for unknown connection handle 3837
+kernel: Bluetooth: hci0: ACL packet for unknown connection handle 3837
+```
+
+The keyboard was transmitting keystroke data on a connection the host had **unilaterally forgotten**. User-visible effect: a stuck key (the key-up report never arrived), then disconnection. This is the strongest single line of evidence that the corruption is host/controller-side connection-table damage — the peripheral did nothing wrong. It also precedes/alternates with the zombie state of §3 on the same machine.
+
 ## 5. Corruption is progressive, with precursors
 
 Kernel/bluez markers observed **before** failures:

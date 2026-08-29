@@ -31,6 +31,12 @@ Bluetooth part (USB 13d3:3585, btusb+btmtk, firmware build 20260724143815).
      to it never complete (connect -> timeout);
    - resolving list entries are configured correctly by the host
      (btmon: LE Add Device To Resolving List + Set Privacy Mode + extended scan).
+2b. In a second failure mode, an actively-used connection is dropped by the
+   host/controller mid-use. Kernel log during typing:
+   "Bluetooth: hci0: ACL packet for unknown connection handle 3837" (x2)
+   — the peripheral keeps transmitting keystroke ACL data on a connection
+   the host side has unilaterally forgotten. User-visible: stuck key
+   (missing key-up report), then disconnection.
 3. A spontaneous "half-dead" event was also captured with no audio device
    attached (bluetoothd: "Wrong size of start discovery return parameters",
    mgmt NotReady), so SCO is an accelerator, not the only trigger.
