@@ -61,7 +61,7 @@ $ sudo modprobe -r btusb btmtk && sudo modprobe btusb
 
 `systemctl restart bluetooth` alone was **not** reliable; driver rebind is. (Same reset recommended by the Framework knowledge base for MT79xx.)
 
-## 4.5 The smoking gun: live connection dropped by the host mid-use
+## 5. The smoking gun: live connection dropped by the host mid-use
 
 During active typing (not idle, no 0x13 involved), the kernel logged:
 
@@ -72,7 +72,7 @@ kernel: Bluetooth: hci0: ACL packet for unknown connection handle 3837
 
 The keyboard was transmitting keystroke data on a connection the host had **unilaterally forgotten**. User-visible effect: a stuck key (the key-up report never arrived), then disconnection. This is the strongest single line of evidence that the corruption is host/controller-side connection-table damage — the peripheral did nothing wrong. It also precedes/alternates with the zombie state of §3 on the same machine.
 
-## 5. Corruption is progressive, with precursors
+## 6. Corruption is progressive, with precursors
 
 Kernel/bluez markers observed **before** failures:
 
@@ -80,7 +80,7 @@ Kernel/bluez markers observed **before** failures:
 - `Bluetooth: hci0: SCO packet for unknown connection handle ×3` — after an HFP earbuds session teardown; failures became frequent afterwards;
 - Background disconnect rate is constant (~8/25 h, ~10/39 h, ~6/10 h across boots) — what changes is **whether they recover**, not how often they happen.
 
-## 6. What was ruled out (and how)
+## 7. What was ruled out (and how)
 
 | Hypothesis | Ruled out by |
 |---|---|
@@ -90,6 +90,6 @@ Kernel/bluez markers observed **before** failures:
 | A2DP audio coexistence | Speaker is a constant, not a variable; keyboard ran fine for 3 h with A2DP streaming; spontaneous case with no audio |
 | System update that day | `dnf history` audit: only mesa/firefox/curl that morning; kernel and firmware were 3–6 days old |
 
-## 7. Trap: tri-mode peripherals increment MAC on re-pair
+## 8. Trap: tri-mode peripherals increment MAC on re-pair
 
 Observed chain on two peripherals (keyboard `…02`, mouse `…03`-style): every remove+re-pair bumps the static address by one (`…6B→6C→6D→6E`). Removing the bond when this bug hits creates a deadlock: peripheral directed-pages the old host, host no longer knows it — looks exactly like "dead keyboard" and destroys evidence. **Rebind first; never remove.**

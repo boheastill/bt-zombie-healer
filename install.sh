@@ -3,6 +3,12 @@
 set -e
 cd "$(dirname "$0")"
 
+# Guard: only install on machines with a MediaTek BT adapter
+if ! lsusb | grep -qiE '13d3|0e8d|0489'; then
+  echo "No MediaTek Bluetooth adapter detected (USB IDs 13d3/0e8d/0489). This tool targets MT79xx — aborting."
+  exit 1
+fi
+
 sudo install -m 755 bt-rebind.sh /usr/local/bin/bt-rebind.sh
 echo "$USER ALL=(root) NOPASSWD: /usr/local/bin/bt-rebind.sh" | sudo tee /etc/sudoers.d/bt-rebind >/dev/null
 sudo chmod 440 /etc/sudoers.d/bt-rebind
