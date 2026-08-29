@@ -24,7 +24,6 @@ sudo install -m 755 70-bt-rebind-sleep.sh /usr/lib/systemd/system-sleep/70-bt-re
 
 mkdir -p ~/.local/bin ~/.config/systemd/user
 install -m 755 bt-watch.sh ~/.local/bin/bt-watch.sh
-sed "s/%h/$(echo $HOME | sed 's/\//\\\//g')/" /dev/null 2>/dev/null || true
 cat > ~/.config/systemd/user/bt-watch.service <<EOF
 [Unit]
 Description=Bluetooth zombie-state watchdog (bt-zombie-healer)

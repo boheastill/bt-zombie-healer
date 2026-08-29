@@ -2,6 +2,17 @@
 
 Auto-healing for the **MediaTek MT79xx Bluetooth "zombie controller" state** — BLE devices keep advertising, the host silently stops accepting them. Watchdog detects, driver-rebind fixes, you just type a key.
 
+## How it works
+
+```mermaid
+flowchart LR
+    A[BLE device power-nap disconnect] --> B{Host accepts reconnect?}
+    B -- yes --> C[Normal: back in 1-2 s on keystroke]
+    B -- no<br/>(zombie state) --> D[bt-watch: down > 25 s]
+    D --> E[auto driver rebind ~3 s]
+    E --> F[keystroke -> back online<br/>same MAC, no re-pairing]
+```
+
 ## The bug (30-second read, evidence in `docs/`)
 
 On MT7921/MT7922/MT7925 combo cards (BT part on USB, `btusb`+`btmtk`), the controller can enter a **silent half-dead state**:

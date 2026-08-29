@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# bt-watch — 键鼠蓝牙失联监控 v4(2026-08-29: 手动恢复兼容+副作用检测)
-# 原则:
-#   1) 用户手动恢复优先: 检测到"配对模式中的新设备条目"=用户在手动配对, 自愈让路
-#   2) 重绑前声明副作用: 记录将闪断的在线设备与音频流, 通知里如实告知
-#   3) 软件自愈兜底: 失联>25s 自动 modprobe 重绑(实测最可靠路径)
-# 日志: ~/.local/state/bt-watch.log ; 病因/死锁原理: ~/bh-workspace/docs/sliver-bt-stability/
-set -u
-KB_GREP="${BT_WATCH_KB:-X87}"            # 触发自愈的判据设备(键盘; 鼠标在线不掩护它)
-LOG_GREP="${BT_WATCH_DEVICES:-X87|MCHOSE}"   # 打点/让路检测范围
+# bt-watch v4.1 - watchdog for the MT79xx BT "zombie controller" state.
+# Principles:
+#   1) Manual recovery wins: an unpaired device entry in pairing mode means the
+#      user is fixing it by hand -> watchdog yields for 3 minutes.
+#   2) Declare side effects before every rebind (devices about to blink, audio).
+#   3) Auto-heal as backstop: keyboard down >25s -> modprobe rebind (proven path).
+# Log: ~/.local/state/bt-watch.log
+KB_GREP="${BT_WATCH_KB:-X87}"            # device whose loss triggers the heal (keyboard)
+LOG_GREP="${BT_WATCH_DEVICES:-X87|MCHOSE}"   # devices tracked for logging / manual-pair detection
 LOG="$HOME/.local/state/bt-watch.log"
 mkdir -p "$(dirname "$LOG")"
 log(){ echo "[$(date '+%F %T')] $*" >> "$LOG"; }
