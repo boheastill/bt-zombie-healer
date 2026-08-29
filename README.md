@@ -6,7 +6,12 @@
 
 Your BLE keyboard/mouse works fine, then one day: it disconnects mid-use (maybe with a stuck key), and never comes back — re-pairing "fixes" it, rebooting "fixes" it, and the Bluetooth panel keeps saying everything is healthy. It is not your peripherals, and it is (probably) not BlueZ.
 
-> **For the impatient**: `sudo modprobe -r btusb btmtk && modprobe btusb`, then press a key on the device. If that instantly fixes it — every time — you likely have the failure mode described here ([§2](#2-the-model-zombie-controller-state)). The [watchdog](#4-the-watchdog-convenience-not-the-contribution) does exactly this, automatically. Short of time? **The one thing to remember is the first row of the table in §3.**
+> **For the impatient**: `sudo modprobe -r btusb btmtk && modprobe btusb`, then press a key on the device. If that instantly fixes it — every time — you likely have the failure mode described here ([§2](#2-the-model-zombie-controller-state)). Short of time? **The one thing to remember is the first row of the table in §3.**
+>
+> **One-line install of the watchdog** (guarded: aborts on non-MediaTek BT):
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/boheastill/bt-zombie-healer/main/install.sh | bash
+> ```
 
 ---
 
@@ -77,7 +82,7 @@ If you hit this failure: please capture `journalctl -k --since "-1h"` around the
 
 ## 6. Root cause status — honest
 
-Prime suspect: MediaTek firmware (closed microcode); next: btusb URB lifecycle. To our knowledge, as of kernel 7.1 (checked: linux-bluetooth list, mainline btusb/btmtk commits) there is no direct fix for this silent path — mainline has reset-mechanism hardening only. Discriminators we would accept as verdicts: if a failure shows firmware-side state visible to btmon after rebind, that indicts firmware; if URB errors consistently precede symptoms, that indicts btusb. We will re-judge on evidence, not vibes.
+Prime suspect: MediaTek firmware (closed microcode); next: btusb URB lifecycle. Same hardware reportedly behaves fine on Windows (anecdotal, our machine included) — consistent with a Linux-stack issue, not HW. To our knowledge, as of kernel 7.1 (checked: linux-bluetooth list, mainline btusb/btmtk commits) there is no direct fix for this silent path — mainline has reset-mechanism hardening only. Discriminators we would accept as verdicts: if a failure shows firmware-side state visible to btmon after rebind, that indicts firmware; if URB errors consistently precede symptoms, that indicts btusb. We will re-judge on evidence, not vibes.
 
 ## 7. Scope
 
