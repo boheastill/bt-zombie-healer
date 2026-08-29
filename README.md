@@ -47,6 +47,9 @@ The watchdog is deliberately **not aggressive**:
 - **Every auto-rebind declares its side effects** first (logged + shown in the notification): all connected BT devices blink off for 2-5 s; a playing BT audio stream interrupts briefly; the GNOME BT panel may show stale state until reopened.
 - Reset path is the proven `modprobe` rebind (Framework-KB equivalent). The theoretically nicer USB `authorized 0/1` toggle **bricked the bluez device table once on the test machine** — documented, avoided.
 
+## Known downstream quirks
+
+- **Chrome microphone freeze**: a Bluetooth device blink (including the 2-5 s blink from an auto-rebind) can trip Chrome's long-standing audio-enumeration bug — `getUserMedia` returns `NotFoundError` while system-level audio is fine. Fix: `chrome://restart`. (Rarely triggered once BT is stable; mentioned so you don't chase ghosts in the wrong layer.)
 ## Scope & honesty
 
 - Verified on: MT7922 (USB 13d3:3585), Fedora 44, kernel 7.1.10, BlueZ 5.79/5.87.
