@@ -41,6 +41,11 @@ while true; do
         elif [ $SECONDS -lt $manual_until ]; then
             log "(手动恢复窗口内, 跳过自愈)"
         else
+            # --- forensics mode: alert only, never auto-rebind ---
+            if [ "${BT_WATCH_FORENSICS:-0}" = "1" ]; then
+                log "取证模式: 只告警不重绑 (BT_WATCH_FORENSICS=1)"
+                notify-send -u critical "蓝牙监控(取证模式)" "键鼠失联 — 未自动修复。请抓证据: journalctl -k --since '-1h' / btmon, 然后手动 sudo /usr/local/bin/bt-rebind.sh" 2>/dev/null
+            else
             # --- 副作用声明 ---
             will_drop=$(bluetoothctl devices Connected 2>/dev/null | awk '{$1="";print}' | sed 's/^ Device //' | tr '\n' ',')
             audio_on=$(pactl list sinks short 2>/dev/null | grep bluez | grep -c RUNNING || true)
@@ -55,6 +60,8 @@ while true; do
                 notify-send -u critical "蓝牙监控:键鼠失联" "自动重绑失败。修复: bash ~/bt-fix.sh" 2>/dev/null
             fi
         fi
+    fi
+
     fi
 
     # 先兆特征(限频10分钟)
