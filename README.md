@@ -39,6 +39,14 @@ systemctl --user edit bt-watch   # or edit ~/.local/bin/bt-watch.sh  BT_WATCH_DE
 
 If your BLE devices already went missing right now: `sudo /usr/local/bin/bt-rebind.sh`, then press any key on the device.
 
+## Side effects & manual-recovery coexistence
+
+The watchdog is deliberately **not aggressive**:
+
+- **You stay in control**: if you start a manual recovery (pairing-mode broadcast detected as an unpaired device entry), the watchdog **yields for 3 minutes** and lets you finish (GNOME panel re-pairing is a valid path — a re-pair even clears the zombie state; it just costs you a MAC bump on tri-mode peripherals).
+- **Every auto-rebind declares its side effects** first (logged + shown in the notification): all connected BT devices blink off for 2-5 s; a playing BT audio stream interrupts briefly; the GNOME BT panel may show stale state until reopened.
+- Reset path is the proven `modprobe` rebind (Framework-KB equivalent). The theoretically nicer USB `authorized 0/1` toggle **bricked the bluez device table once on the test machine** — documented, avoided.
+
 ## Scope & honesty
 
 - Verified on: MT7922 (USB 13d3:3585), Fedora 44, kernel 7.1.10, BlueZ 5.79/5.87.

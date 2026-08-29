@@ -1,68 +1,67 @@
 #!/usr/bin/env bash
-# bt-watch — 键鼠蓝牙失联监控 v2(sliver,2026-08-29 会诊后升级)
-# 职责:
-#   1) 每 30s 轮询键鼠连接;断开/恢复打点(含离线时长);断开瞬间抓内核 hci0 现场
-#   2) 监听先兆日志特征(agy/kimi 会诊特征表):
-#      - "SCO packet for unknown connection handle" → 黄警(适配器即将/已经带伤)
-#      - "Wrong size of start discovery" / "hci0.*timed out" → 红警(栈半死)
-#   3) 键盘失联>90s 弹一次桌面通知(指向 bt-fix.sh)
-# 日志: ~/.local/state/bt-watch.log ; 病因: ~/bh-workspace/docs/sliver-bt-stability/
+# bt-watch — 键鼠蓝牙失联监控 v4(2026-08-29: 手动恢复兼容+副作用检测)
+# 原则:
+#   1) 用户手动恢复优先: 检测到"配对模式中的新设备条目"=用户在手动配对, 自愈让路
+#   2) 重绑前声明副作用: 记录将闪断的在线设备与音频流, 通知里如实告知
+#   3) 软件自愈兜底: 失联>25s 自动 modprobe 重绑(实测最可靠路径)
+# 日志: ~/.local/state/bt-watch.log ; 病因/死锁原理: ~/bh-workspace/docs/sliver-bt-stability/
 set -u
-DEVICE_GREP="${BT_WATCH_DEVICES:-X87|MCHOSE}"   # edit to your device name fragments
+DEVICE_GREP="${BT_WATCH_DEVICES:-X87|MCHOSE}"   # 设备名片段, 可改
 LOG="$HOME/.local/state/bt-watch.log"
 mkdir -p "$(dirname "$LOG")"
 log(){ echo "[$(date '+%F %T')] $*" >> "$LOG"; }
-log "bt-watch v3 启动(失联自动重绑) (pid $$)"
+log "bt-watch v4 启动(手动兼容+副作用声明) (pid $$)"
 
-kbd=up mouse=up; kbd_down=0 mouse_down=0; kbd_notified=0
+state=up; down_since=0; notified=0; manual_until=0
 sco_last=0; dead_last=0
 while true; do
-    conn=$(bluetoothctl devices Connected 2>/dev/null)
-    echo "$conn" | grep -qE "$DEVICE_GREP" && k=1 || k=0
-    echo "$conn" | grep -qE "$DEVICE_GREP" && m=1 || m=0
+    if bluetoothctl devices Connected 2>/dev/null | grep -qE "$DEVICE_GREP"; then cur=1; else cur=0; fi
 
-    # 键盘状态机
-    if [ "$k" = 0 ] && [ "$kbd" = up ]; then
-        kbd=down; kbd_down=$SECONDS; kbd_notified=0
-        log "键盘断开; 内核现场:"
-        journalctl -k --since '-45s' --no-pager 2>/dev/null | grep -i 'hci0' | tail -4 | sed 's/^/    /' >> "$LOG"
-    elif [ "$k" = 1 ] && [ "$kbd" = down ]; then
-        kbd=up; log "键盘恢复(离线 $((SECONDS - kbd_down))s)"
-    elif [ "$kbd" = down ] && [ "$kbd_notified" = 0 ] && [ $((SECONDS - kbd_down)) -ge 25 ]; then
-        kbd_notified=1
-        log "键盘失联>25s, 自动重绑蓝牙驱动..."
-        if sudo -n /usr/local/bin/bt-rebind.sh >/dev/null 2>&1; then
-            log "重绑完成, 等待敲键回连"
-            notify-send -u normal "蓝牙监控:已自动修复" \
-                "检测到键盘失联,驱动已重绑。\n敲任意键即回连(若仍无反应: 断电重启键盘)" 2>/dev/null
+    if [ "$cur" = 0 ] && [ "$state" = up ]; then
+        state=down; down_since=$SECONDS; notified=0
+        log "键鼠断开; 内核现场:"
+        journalctl -k --since '-25s' --no-pager 2>/dev/null | grep -i 'hci0' | tail -4 | sed 's/^/    /' >> "$LOG"
+    elif [ "$cur" = 1 ] && [ "$state" = down ]; then
+        state=up; log "键鼠恢复(离线 $((SECONDS - down_since))s)"
+    fi
+
+    if [ "$state" = down ] && [ "$notified" = 0 ] && [ $((SECONDS - down_since)) -ge 25 ]; then
+        notified=1
+        # --- 手动恢复兼容: 未配对的新条目 = 用户在配对模式手动恢复, 自愈让路3分钟 ---
+        unpaired=""
+        for a in $(bluetoothctl devices 2>/dev/null | grep -iE "$DEVICE_GREP" | awk '{print $2}'); do
+            bluetoothctl info "$a" 2>/dev/null | grep -q 'Paired: yes' || unpaired="$unpaired $a"
+        done
+        if [ -n "$unpaired" ]; then
+            manual_until=$((SECONDS + 180))
+            log "手动恢复让路: 未配对条目($unpaired), 3分钟内不自愈"
+            notify-send -u normal "蓝牙监控:检测到手动恢复中" \
+                "已让路3分钟,你操作完我继续接手。放弃手动就等3分钟,自动修复会接上" 2>/dev/null
+        elif [ $SECONDS -lt $manual_until ]; then
+            log "(手动恢复窗口内, 跳过自愈)"
         else
-            log "自动重绑失败(无免密权限?)"
-            notify-send -u critical "蓝牙监控:键盘失联" \
-                "超 60 秒未恢复且自动重绑失败。\n修复: bash ~/bt-fix.sh" 2>/dev/null
+            # --- 副作用声明 ---
+            will_drop=$(bluetoothctl devices Connected 2>/dev/null | awk '{$1="";print}' | sed 's/^ Device //' | tr '\n' ',')
+            audio_on=$(pactl list sinks short 2>/dev/null | grep bluez | grep -c RUNNING || true)
+            log "自动重绑 | 副作用: 在线设备闪断2-5秒[${will_drop:-无}] 蓝牙音频流[$audio_on]"
+            if sudo -n /usr/local/bin/bt-rebind.sh >/dev/null 2>&1; then
+                log "重绑完成, 等待敲键回连"
+                extra=""; [ "${audio_on:-0}" -gt 0 ] 2>/dev/null && extra=",音频中断过"
+                notify-send -u normal "蓝牙监控:已自动修复" \
+                    "驱动已重绑,敲任意键即回。副作用:在线蓝牙设备刚才闪断了几秒$extra" 2>/dev/null
+            else
+                log "自动重绑失败(无免密权限?)"
+                notify-send -u critical "蓝牙监控:键鼠失联" "自动重绑失败。修复: bash ~/bt-fix.sh" 2>/dev/null
+            fi
         fi
     fi
 
-    # 鼠标状态机(只打点不通知,鼠标多数能自愈)
-    if [ "$m" = 0 ] && [ "$mouse" = up ]; then
-        mouse=down; mouse_down=$SECONDS; log "鼠标断开"
-    elif [ "$m" = 1 ] && [ "$mouse" = down ]; then
-        mouse=up; log "鼠标恢复(离线 $((SECONDS - mouse_down))s)"
+    # 先兆特征(限频10分钟)
+    if journalctl -k --since '-15s' --no-pager 2>/dev/null | grep -q 'SCO packet for unknown connection handle'; then
+        [ $((SECONDS - sco_last)) -ge 600 ] && { sco_last=$SECONDS; log "先兆: SCO unknown handle(适配器带伤)"; }
     fi
-
-    # 先兆特征监控(限频:同类 10 分钟内只报一次)
-    if journalctl -k --since '-35s' --no-pager 2>/dev/null | grep -q 'SCO packet for unknown connection handle'; then
-        if [ $((SECONDS - sco_last)) -ge 600 ]; then
-            sco_last=$SECONDS
-            log "先兆: SCO unknown handle 出现(适配器带伤, 键鼠可能即将失联)"
-            notify-send -u normal "蓝牙监控:SCO 异常" "适配器状态受损先兆,键鼠断开后可能无法自动恢复。发作时: bash ~/bt-fix.sh" 2>/dev/null
-        fi
-    fi
-    if journalctl -k -u bluetooth --since '-35s' --no-pager 2>/dev/null | grep -qE 'Wrong size of start discovery|hci0.*timed out'; then
-        if [ $((SECONDS - dead_last)) -ge 600 ]; then
-            dead_last=$SECONDS
-            log "红警: 蓝牙栈半死特征(NotReady/Wrong size), 已通知"
-            notify-send -u critical "蓝牙监控:栈半死" "检测到适配器半死特征。恢复: bash ~/bt-fix.sh 或等软复位" 2>/dev/null
-        fi
+    if journalctl -k -u bluetooth --since '-15s' --no-pager 2>/dev/null | grep -qE 'Wrong size of start discovery|hci0.*timed out'; then
+        [ $((SECONDS - dead_last)) -ge 600 ] && { dead_last=$SECONDS; log "红警: 栈半死特征(NotReady/Wrong size)"; }
     fi
 
     sleep 10
