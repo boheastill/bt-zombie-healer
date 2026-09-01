@@ -87,3 +87,7 @@ Prime suspect: MediaTek firmware (closed microcode); next: btusb URB lifecycle. 
 ## 7. Scope
 
 Verified as of **2026-08-29** on: MT7922 (USB 13d3:3585), Fedora 44, kernel 7.1.10, BlueZ 5.79 & 5.87. Related reports suggest the family covers MT7921/7925 — unverified here. This is a **mitigation, not a cure**; the goal is that you stop noticing the disease. MIT license. [中文版 README](README.zh-CN.md)
+
+---
+
+**Author**: [Bohea](https://boheastill.com) — independent industrial software engineer (Shenzhen). Operator HMIs · device integration · machine data into your customer's ERP. More runnable demos & engineering notes on the site.
