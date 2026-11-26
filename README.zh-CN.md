@@ -60,3 +60,7 @@
 ## 七、范围
 
 **验证时点 2026-08-29**:MT7922(USB 13d3:3585)、Fedora 44、内核 7.1.10、BlueZ 5.79 与 5.87。相关报告提示 MT7921/7925 同族(未验证)。这是**缓解不是根治**,目标是让你感觉不到病。MIT。[English README](README.md)
+
+---
+
+*排查与维护：[Bohea](https://boheastill.com/zh/?r=gh-bt-healer)（[hi@boheastill.com](mailto:hi@boheastill.com)）— 独立软硬件与工业系统工程师（深圳）。*
