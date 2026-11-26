@@ -90,4 +90,4 @@ Verified as of **2026-08-29** on: MT7922 (USB 13d3:3585), Fedora 44, kernel 7.1.
 
 ---
 
-**Author**: [Bohea](https://boheastill.com) — independent industrial software engineer (Shenzhen). Operator HMIs · device integration · machine data into your customer's ERP. More runnable demos & engineering notes on the site.
+*Characterized & maintained by [Bohea](https://boheastill.com/?r=gh-bt-healer) ([hi@boheastill.com](mailto:hi@boheastill.com)) — independent hardware↔software & Linux/industrial systems engineer (Shenzhen).*
